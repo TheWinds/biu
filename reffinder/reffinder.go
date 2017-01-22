@@ -1,40 +1,42 @@
-package refFinder
+package reffinder
 
 import (
 	"errors"
 	"strings"
 
-	"fmt"
-
 	"regexp"
 
 	"bytes"
+
+	"runtime"
+
+	"path/filepath"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
 var finders = map[string]interface{}{
-	"JS":   new(JSFinder),
-	"CSS":  new(CSSFinder),
-	"HTML": new(HTMLFinder),
+	".js":   new(JSFinder),
+	".css":  new(CSSFinder),
+	".html": new(HTMLFinder),
 }
 
 //FindFileRef 查找文件引用
 func FindFileRef(file []byte, filePath, rootPath string) ([]string, error) {
 	//获取文件类型
-	indexLastDot := strings.LastIndex(filePath, ".")
-	fileType := filePath[indexLastDot+1:]
-	fileType = strings.ToUpper(fileType)
+	ext := filepath.Ext(filePath)
+	ext = strings.ToLower(ext)
 	//查找是否存在对应文件类型的引用发现器
-	finder, has := finders[fileType]
+	finder, has := finders[ext]
 	if !has {
-		return nil, errors.New("FindFileRef:文件类型不支持,(type):." + fileType)
+		return nil, errors.New("FindFileRef:文件类型不支持,(type):" + ext)
 	}
 	//查找引用的文件转换为真实路径
 	refList := (finder.(refFinder)).FindRef(file)
 	var ret []string
 	for _, refFilePath := range refList {
-		if refFilePath != "" {
+		//过滤掉非法路径
+		if refFilePath != "" && !isURL(refFilePath) {
 			realPath, err := getRealPath(filePath, refFilePath, rootPath)
 			if err != nil {
 				return nil, err
@@ -47,10 +49,13 @@ func FindFileRef(file []byte, filePath, rootPath string) ([]string, error) {
 
 //getRealPath 获取被引用文件相对根目录的真实地址
 func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
-
+	pathSep := "/"
+	if runtime.GOOS == "windows" {
+		pathSep = "\\"
+	}
 	//统一格式
-	if !strings.HasSuffix(rootPath, "\\") {
-		rootPath = rootPath + "\\"
+	if !strings.HasSuffix(rootPath, pathSep) {
+		rootPath = rootPath + pathSep
 	}
 	if strings.HasPrefix(refFilePath, "/") {
 		refFilePath = "~" + refFilePath
@@ -58,7 +63,7 @@ func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
 	//取到文件相对与网站根目录的路径
 	relRootPath := strings.Replace(filePath, rootPath, "", -1)
 	//分割剩下目录信息
-	relRootPaths := strings.Split(relRootPath, "\\")
+	relRootPaths := strings.Split(relRootPath, pathSep)
 	// fmt.Println(relRootPath, "：", relRootPaths, len(relRootPaths))
 	relRootPaths = relRootPaths[:len(relRootPaths)-1]
 	//分割引用文件路径剩下目录和文件信息
@@ -87,7 +92,7 @@ func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
 	//还原路径
 	for i, path := range newPaths {
 		if i != 0 {
-			realPath += "\\"
+			realPath += pathSep
 		}
 		realPath += path
 	}
@@ -110,6 +115,7 @@ func (hf *HTMLFinder) FindRef(inputs []byte) []string {
 	if err != nil {
 		return nil
 	}
+	doc.Find("script").Each(hf.queryJSFromScript)
 	doc.Find("link").Each(hf.queryCSSFromLink)
 	doc.Find("style").Each(hf.queryCSSFromStyle)
 	doc.Find("img").Each(hf.queryImgFromImg)
@@ -120,7 +126,6 @@ func (hf *HTMLFinder) queryCSSFromLink(i int, s *goquery.Selection) {
 		return
 	}
 	if href, exist := s.Attr("href"); exist {
-		fmt.Println(href)
 		hf.refList = append(hf.refList, href)
 	}
 }
@@ -153,6 +158,11 @@ func (hf *HTMLFinder) queryCSSFromStyle(i int, s *goquery.Selection) {
 	}
 }
 func (hf *HTMLFinder) queryImgFromImg(i int, s *goquery.Selection) {
+	if src, exist := s.Attr("src"); exist {
+		hf.refList = append(hf.refList, src)
+	}
+}
+func (hf *HTMLFinder) queryJSFromScript(i int, s *goquery.Selection) {
 	if src, exist := s.Attr("src"); exist {
 		hf.refList = append(hf.refList, src)
 	}
@@ -205,41 +215,10 @@ func (cf *CSSFinder) FindRef(inputs []byte) []string {
 	return cf.refList
 }
 
-// func main() {
+//
+func isURL(path string) bool {
+	pattern := `(http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?|\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&:/~\+#]*[\w\-\@?^=%&/~\+#])?`
+	matcher, _ := regexp.Compile(pattern)
+	return matcher.MatchString(path)
 
-// 	html := `<html>
-// 		<head>
-
-// 			<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-// 			<meta http-equiv="content-type" content="text/html;charset=utf-8">
-// 			<meta content="always" name="referrer">
-// 	        <meta name="theme-color" content="#2932e1">
-// 	        <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-// 	        <link rel="icon" sizes="any" mask href="//www.baidu.com/img/baidu.svg">
-// 	        <link rel="search" type="application/opensearchdescription+xml" href="/content-search.xml" title="百度搜索" />
-// 	        <link rel="stylesheet"  href="style.css" type="text/css" />
-// 	        <style>
-// 	            @import url("xxx")
-// 	            @import "ccc.css"
-// 	            @import "./d.css"
-// 	                    <style>
-// 	            @import "/pic/asdfdasf.css"
-// 	  @import  sa    "bbb.css"
-// 	  @import url("xxx")
-// 	        </style>
-// 			<style>
-// 	@import "./asdfdasf.css"
-// 	(@import\s*\".+[\"$])
-// 	        </style>
-// 			<img src="sdsadsa.jpg">
-// 	<title>goquery_百度搜索</title>
-// 	</head></html>
-// 	`
-
-// 	hf := new(HTMLFinder)
-// 	b := []byte(html)
-// 	hf.FindRef(b)
-// 	fmt.Println(hf.refList)
-// 	fmt.Println(FindFileRef(b, `C:\Users\BYONE\Desktop\t\ss\1.html`, `C:\Users\BYONE\Desktop\t\`))
-// 	fmt.Println(getRealPath(`C:\Users\BYONE\Desktop\t\ss\1.html`, "/pic/../bbb/pic1.png", `C:\Users\BYONE\Desktop\t\`))
-// }
+}
