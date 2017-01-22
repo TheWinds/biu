@@ -1,10 +1,14 @@
 package filerefmap
 
-import "errors"
+import (
+	"errors"
+	"path/filepath"
+	"strings"
+)
 
 //FileNode 文件节点
 type FileNode struct {
-	Name string   //文件名
+	Id   int      //文件Id
 	Path string   //文件路径
 	Type FileType //文件类型
 
@@ -40,6 +44,38 @@ type FileNode struct {
 
 // }
 
+func (node *FileNode) getFileType() FileType {
+	ext := filepath.Ext(node.Path)
+	ext = strings.ToLower(ext)
+	switch ext {
+	case ".html":
+		return HTMLFile
+	case ".js":
+		return JSFile
+	case ".css":
+		return CSSFile
+	case ".gif", ".png", ".jpg":
+		return IMGFile
+	default:
+		return NotSupportFile
+	}
+}
+
+//IsRef 判断你是否被引用
+func (node *FileNode) IsRef(refedNode *FileNode) bool {
+	if node.RefFiles == nil {
+		return false
+	}
+	p := node.RefFiles.NextRef
+	for p != nil {
+		if p.FileId == refedNode.Id {
+			return true
+		}
+		p = p.NextRef
+	}
+	return false
+}
+
 //AddFileRef 新增文件引用 参数（被引用的节点）
 func (node *FileNode) AddFileRef(refedNode *FileNode) {
 	//将被引用的节点加入当前节点的引用列表
@@ -51,15 +87,16 @@ func (node *FileNode) AddFileRef(refedNode *FileNode) {
 //DelFileRef 删除文件引用 参数（被删除的文件路径）
 func (node *FileNode) DelFileRef(refedNode *FileNode) {
 	//将被引用的节点从当前引用列表中删除
-	node.delRefAndChangeCnt(refedNode.Path, &node.RefFiles, &node.RefCnt)
+	node.delRefAndChangeCnt(refedNode.Id, &node.RefFiles, &node.RefCnt)
 	//将被当前节点从被引用节点的被引用列表中删除
-	node.delRefAndChangeCnt(node.Path, &refedNode.RefedFiles, &refedNode.RefedCnt)
+	node.delRefAndChangeCnt(node.Id, &refedNode.RefedFiles, &refedNode.RefedCnt)
 }
 
 //addRefAndChangeCnt 新增引用并且计数
 func (node *FileNode) addRefAndChangeCnt(refedNode *FileNode, refTo **RefRelNode, cnt *int) {
 	//在当前节点将被引用的节点加入引用列表
-	newRef := &RefRelNode{NodePath: refedNode.Path}
+
+	newRef := &RefRelNode{FileId: refedNode.Id}
 	if *cnt == 0 {
 		*refTo = new(RefRelNode)
 	}
@@ -69,13 +106,13 @@ func (node *FileNode) addRefAndChangeCnt(refedNode *FileNode, refTo **RefRelNode
 }
 
 //delRefAndChangeCnt 删除引用并且计数
-func (node *FileNode) delRefAndChangeCnt(refedFilePath string, refTo **RefRelNode, cnt *int) error {
+func (node *FileNode) delRefAndChangeCnt(refedFileID int, refTo **RefRelNode, cnt *int) error {
 
 	var curRef = (*refTo).NextRef
 	var frontCurRef = (*refTo)
 	isFind := false
 	for curRef != nil {
-		if curRef.NodePath == refedFilePath {
+		if curRef.FileId == refedFileID {
 			frontCurRef.NextRef = curRef.NextRef
 			isFind = true
 			break
@@ -84,7 +121,7 @@ func (node *FileNode) delRefAndChangeCnt(refedFilePath string, refTo **RefRelNod
 		frontCurRef = frontCurRef.NextRef
 	}
 	if !isFind {
-		return errors.New("FileNode:边不存在")
+		return errors.New("FileNode.delRefAndChangeCnt:边不存在")
 	}
 	*cnt--
 	return nil

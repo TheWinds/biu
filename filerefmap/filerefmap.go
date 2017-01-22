@@ -8,41 +8,77 @@ import (
 
 //RefRelNode 文件引用关系节点
 type RefRelNode struct {
-	NodePath string      //对应文件路径
-	NextRef  *RefRelNode //下一个节点
+	FileId  int         //对应文件Id
+	NextRef *RefRelNode //下一个节点
 }
 
 //FileRefMap 文件关系图
 type FileRefMap struct {
-	files map[string]*FileNode
+	ids    int               //当前id编号
+	files  map[int]*FileNode //id->filenode
+	pathID map[string]int    //filePath->fileId
+}
+
+//根据文件路径取回文件节点
+func (frm *FileRefMap) getFileFromPath(filePath string) *FileNode {
+	id := frm.pathID[filePath]
+	return frm.files[id]
+
 }
 
 //Contains 是否存在文件
-func (frm *FileRefMap) Contains(path string) bool {
-	_, contains := frm.files[path]
+func (frm *FileRefMap) Contains(filePath string) bool {
+	if frm.pathID == nil {
+		return false
+	}
+	_, contains := frm.pathID[filePath]
 	return contains
 }
 
+//IsRefFile IsRefFile(A,B) B是否被A引用
+func (frm *FileRefMap) IsRefFile(pathFrom, pathTo string) bool {
+	if !(frm.Contains(pathFrom) && frm.Contains(pathTo)) {
+		return false
+	}
+	fileFrom := frm.getFileFromPath(pathFrom)
+	fileTo := frm.getFileFromPath(pathTo)
+	return fileFrom.IsRef(fileTo)
+}
 func (frm *FileRefMap) copy() *FileRefMap {
 
-	newFiles := make(map[string]*FileNode)
+	newFiles := make(map[int]*FileNode)
+	newPathID := make(map[string]int)
+	ids := frm.ids
 	deepCopy(&newFiles, frm.files)
-	relcpy := &FileRefMap{files: newFiles}
+	deepCopy(&newPathID, frm.pathID)
+	relcpy := &FileRefMap{files: newFiles, pathID: newPathID, ids: ids}
 	return relcpy
 }
 
 // AddFile 新增文件
-func (frm *FileRefMap) AddFile(name, path string, filetype FileType) error {
+func (frm *FileRefMap) AddFile(fileNode FileNode) error {
 	//检查path
-	//
+
+	//如果当前不存在任何文件,则初始化
 	if frm.files == nil {
-		frm.files = make(map[string]*FileNode)
+		frm.files = make(map[int]*FileNode)
+		frm.pathID = make(map[string]int)
 	}
-	if frm.Contains(path) {
-		return errors.New("FileRefMap:文件已经存在")
+	if frm.Contains(fileNode.Path) {
+		return errors.New("FileRefMap.AddFile:文件已经存在")
 	}
-	node := &FileNode{Name: name, Path: path, Type: filetype}
-	frm.files[path] = node
+	fileType := fileNode.getFileType()
+	if fileType == NotSupportFile {
+		return errors.New("FileRefMap.AddFile:文件类型不支持")
+	}
+	//生成文件ID
+	fileNode.Id = frm.ids + 1
+	fileNode.Type = fileType
+	//文件路径=>文件id
+	frm.pathID[fileNode.Path] = fileNode.Id
+	//id=>文件
+	frm.files[fileNode.Id] = &fileNode
+	frm.ids++
 	return nil
 }
 
@@ -50,43 +86,67 @@ func (frm *FileRefMap) AddFile(name, path string, filetype FileType) error {
 func (frm *FileRefMap) RemoveFile(path string) error {
 	//检查path
 	//
-	if frm.files == nil {
-		return errors.New("FileRefMap:文件不存在")
-	}
 	if !frm.Contains(path) {
-		return errors.New("FileRefMap:文件不存在")
+		return errors.New("FileRefMap.RemoveFile:文件不存在")
 	}
-	node := frm.files[path]
-	if node.RefedCnt != 0 {
-		p := node.RefedFiles.NextRef
+	//取到文件
+	fileNode := frm.getFileFromPath(path)
+	if fileNode.RefedCnt != 0 {
+		p := fileNode.RefedFiles.NextRef
 		for p != nil {
 			//删除引用的文件
-			frm.files[p.NodePath].DelFileRef(frm.files[node.Path])
+			frm.files[p.FileId].DelFileRef(frm.files[fileNode.Id])
 			p = p.NextRef
 		}
 	}
-	if node.RefCnt != 0 {
-		p := node.RefFiles.NextRef
+	if fileNode.RefCnt != 0 {
+		p := fileNode.RefFiles.NextRef
 		for p != nil {
 			//删除入度
-			frm.files[node.Path].DelFileRef(frm.files[p.NodePath])
+			frm.files[fileNode.Id].DelFileRef(frm.files[p.FileId])
 			p = p.NextRef
 		}
 	}
-	delete(frm.files, path)
+	delete(frm.files, fileNode.Id)
+	delete(frm.pathID, fileNode.Path)
+	return nil
+}
+
+// ReNameFile 修改文件名
+func (frm *FileRefMap) ReNameFile(oldPath, newPath string) error {
+	if !frm.Contains(oldPath) {
+		return errors.New("FileRefMap.ReNameFile:文件不存在")
+	}
+	oldFile := frm.getFileFromPath(oldPath)
+	oldFile.Path = newPath
+	newType := oldFile.getFileType()
+	if newType == NotSupportFile {
+		oldFile.Path = oldPath
+		return errors.New("FileRefMap.ReNameFile:文件类型不支持")
+	}
+	oldFile.Path = newPath
+	oldFile.Type = oldFile.getFileType()
+	frm.pathID[newPath] = oldFile.Id
+	delete(frm.pathID, oldPath)
 	return nil
 }
 
 // AddRef 引用文件
 func (frm *FileRefMap) AddRef(pathFrom, pathTo string) error {
-	if frm.files == nil {
-		return errors.New("FileRefMap:引用文件不存在")
-	}
 	if !(frm.Contains(pathFrom) && frm.Contains(pathTo)) {
-		return errors.New("FileRefMap:引用文件失败文件不存在")
+		return errors.New("FileRefMap.AddRef:引用文件失败文件不存在")
 	}
-
-	frm.files[pathFrom].AddFileRef(frm.files[pathTo])
+	// fmt.Println(pathFrom, pathTo)
+	fileFrom := frm.getFileFromPath(pathFrom)
+	fileTo := frm.getFileFromPath(pathTo)
+	// fmt.Println(frm.files)
+	// fmt.Println(frm.pathID)
+	// fmt.Println(fileFrom, fileTo)
+	fileFrom.AddFileRef(fileTo)
+	if frm.checkCircularRef() {
+		fileFrom.DelFileRef(fileTo)
+		return errors.New("FileRefMap.AddRef:存在循环引用")
+	}
 	return nil
 }
 
@@ -95,13 +155,15 @@ func (frm *FileRefMap) FindRoots(filePath string) []string {
 	if !frm.Contains(filePath) {
 		return nil
 	}
+	fileTo := frm.getFileFromPath(filePath)
 	var roots []string
-	for _, node := range frm.files {
-		if node.Type != HTMLFile {
+	for _, fileNode := range frm.files {
+		if fileNode.Type != HTMLFile {
 			continue
 		}
-		if frm.isConnect(node, frm.files[filePath]) {
-			roots = append(roots, node.Path)
+		//
+		if frm.isConnect(fileNode, fileTo) {
+			roots = append(roots, fileNode.Path)
 		}
 	}
 	return roots
@@ -119,7 +181,8 @@ func (frm *FileRefMap) isConnect(from *FileNode, to *FileNode) bool {
 		if frontNode.RefCnt != 0 {
 			p := frontNode.RefFiles.NextRef
 			for p != nil {
-				queue <- frm.files[p.NodePath]
+				//把当前节点加入队列
+				queue <- frm.files[p.FileId]
 				p = p.NextRef
 			}
 		}
