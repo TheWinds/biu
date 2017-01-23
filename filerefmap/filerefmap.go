@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+	"strings"
 )
 
 //RefRelNode 文件引用关系节点
@@ -112,6 +113,17 @@ func (frm *FileRefMap) RemoveFile(path string) error {
 	return nil
 }
 
+// RemoveDirFile 根据dir删除文件
+func (frm *FileRefMap) RemoveDirFile(dir string) {
+	//检查path
+	//
+	for filePath := range frm.pathID {
+		if strings.HasPrefix(filePath, dir) {
+			frm.RemoveFile(filePath)
+		}
+	}
+}
+
 // ReNameFile 修改文件名
 func (frm *FileRefMap) ReNameFile(oldPath, newPath string) error {
 	if !frm.Contains(oldPath) {
@@ -148,6 +160,83 @@ func (frm *FileRefMap) AddRef(pathFrom, pathTo string) error {
 		return errors.New("FileRefMap.AddRef:存在循环引用")
 	}
 	return nil
+}
+
+// DelRef 删除文件引用
+func (frm *FileRefMap) DelRef(pathFrom, pathTo string) error {
+	if !(frm.Contains(pathFrom) && frm.Contains(pathTo)) {
+		return errors.New("FileRefMap.DelRef:引用文件失败文件不存在")
+	}
+	// fmt.Println(pathFrom, pathTo)
+	fileFrom := frm.getFileFromPath(pathFrom)
+	fileTo := frm.getFileFromPath(pathTo)
+	// fmt.Println(frm.files)
+	// fmt.Println(frm.pathID)
+	// fmt.Println(fileFrom, fileTo)
+	fileFrom.DelFileRef(fileTo)
+	return nil
+}
+
+// UpdateRef 更新新文件引用
+func (frm *FileRefMap) UpdateRef(pathFrom string, newRefList []string) {
+	if !frm.Contains(pathFrom) {
+		return
+	}
+	fileFrom := frm.getFileFromPath(pathFrom)
+	if fileFrom.RefCnt != 0 {
+		refedNodes := make([]*FileNode, 0)
+		p := fileFrom.RefFiles.NextRef
+		//寻找多余引用
+		for p != nil {
+			refedNodes = append(refedNodes, frm.files[p.FileId])
+			p = p.NextRef
+		}
+		fileFrom.ReSetFileRef(refedNodes)
+	}
+	for _, newRef := range newRefList {
+		if frm.Contains(newRef) {
+			fileTo := frm.getFileFromPath(newRef)
+			fileFrom.AddFileRef(fileTo)
+		}
+	}
+	// fmt.Println(pathFrom, pathTo)
+	// fileFrom := frm.getFileFromPath(pathFrom)
+	// for _, newRef := range newRefList {
+	// 	if frm.Contains(newRef) {
+	// 		fileTo := frm.getFileFromPath(newRef)
+	// 		//新增原来没有引用
+	// 		if !fileFrom.IsRef(fileTo) {
+	// 			fileFrom.AddFileRef(fileTo)
+	// 		}
+	// 	}
+	// }
+	// if fileFrom.RefCnt != 0 {
+	// 	dels := make([]string, 0)
+	// 	p := fileFrom.RefFiles.NextRef
+	// 	//寻找多余引用
+	// 	for p != nil {
+	// 		oldRef := frm.files[p.FileId].Path
+	// 		shouldDel := true
+	// 		for _, newRef := range newRefList {
+	// 			if oldRef == newRef {
+	// 				shouldDel = false
+	// 			}
+	// 		}
+	// 		if shouldDel {
+	// 			dels = append(dels, oldRef)
+	// 		}
+	// 		p = p.NextRef
+	// 	}
+	// 	//删除多余引用
+	// 	for _, oldRef := range dels {
+	// 		if frm.Contains(oldRef) {
+	// 			fileTo := frm.getFileFromPath(oldRef)
+	// 			fileFrom.DelFileRef(fileTo)
+
+	// 		}
+	// 	}
+	// }
+	return
 }
 
 //FindRoots 寻找根节点

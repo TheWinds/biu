@@ -65,4 +65,18 @@ func TestAll(t *testing.T) {
 		So(relmap.Contains("/index_new.html"), ShouldBeTrue)
 		So(relmap.IsRefFile("/index_new.html", "/js/j1.js"), ShouldBeTrue)
 	})
+
+	relmap.AddFile(FileNode{Path: "/js/j8.js"})
+	relmap.UpdateRef("/index_new.html", []string{"/js/j1.js", "/js/j8.js"})
+	Convey("测试更新引用", t, func() {
+		So(relmap.IsRefFile("/index_new.html", "/js/j1.js"), ShouldBeTrue)
+		So(relmap.IsRefFile("/index_new.html", "/js/j8.js"), ShouldBeTrue)
+		So(relmap.IsRefFile("/index_new.html", "/js/j2.js"), ShouldBeFalse)
+	})
+	relmap.RemoveDirFile("/js")
+	Convey("测试根据文件夹删除", t, func() {
+		So(relmap.Contains("/js/j1.js"), ShouldBeFalse)
+		So(relmap.Contains("/js/j2.js"), ShouldBeFalse)
+	})
+
 }

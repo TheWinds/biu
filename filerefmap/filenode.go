@@ -92,6 +92,31 @@ func (node *FileNode) DelFileRef(refedNode *FileNode) {
 	node.delRefAndChangeCnt(node.Id, &refedNode.RefedFiles, &refedNode.RefedCnt)
 }
 
+//ReSetFileRef 重置文件引用
+func (node *FileNode) ReSetFileRef(refedNodes []*FileNode) {
+	if node.RefCnt == 0 {
+		return
+	}
+	for _, refedNode := range refedNodes {
+		node.DelFileRef(refedNode)
+	}
+	//将引用列表清除
+	// refIDs := make([]int, 10)
+	// p := node.RefFiles.NextRef
+	// for p != nil {
+	// 	refIDs = append(refIDs, p.FileId)
+	// 	p = p.NextRef
+	// }
+	// for _, refID := range refIDs {
+	// 	//将被引用的节点从当前引用列表中删除
+	// 	node.delRefAndChangeCnt(refID, &node.RefFiles, &node.RefCnt)
+	// 	//将被当前节点从被引用节点的被引用列表中删除
+	// 	refedNode
+	// 	node.delRefAndChangeCnt(node.Id, &refedNode.RefedFiles, &refedNode.RefedCnt)
+	// }
+	// node.clearRefAndChangeCnt(&node.RefFiles, &node.RefCnt)
+}
+
 //addRefAndChangeCnt 新增引用并且计数
 func (node *FileNode) addRefAndChangeCnt(refedNode *FileNode, refTo **RefRelNode, cnt *int) {
 	//在当前节点将被引用的节点加入引用列表
@@ -125,4 +150,10 @@ func (node *FileNode) delRefAndChangeCnt(refedFileID int, refTo **RefRelNode, cn
 	}
 	*cnt--
 	return nil
+}
+
+//clearRefAndChangeCnt 删除引用并且计数
+func (node *FileNode) clearRefAndChangeCnt(refTo **RefRelNode, cnt *int) {
+	(*refTo) = nil
+	*cnt = 0
 }
