@@ -32,6 +32,7 @@ func FindFileRef(file []byte, filePath, rootPath string) ([]string, error) {
 		return nil, errors.New("FindFileRef:文件类型不支持,(type):" + ext)
 	}
 	//查找引用的文件转换为真实路径
+	(finder.(refFinder)).Reset()
 	refList := (finder.(refFinder)).FindRef(file)
 	var ret []string
 	for _, refFilePath := range refList {
@@ -102,11 +103,17 @@ func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
 //refFinder 医用发现器接口
 type refFinder interface {
 	FindRef(inputs []byte) []string
+	Reset()
 }
 
 // HTMLFinder 引用发现器
 type HTMLFinder struct {
 	refList []string
+}
+
+// Reset 重置
+func (hf *HTMLFinder) Reset() {
+	hf.refList = make([]string, 20)
 }
 
 //FindRef 查找HTML文件的所有引用
@@ -173,6 +180,11 @@ type JSFinder struct {
 	refList []string
 }
 
+// Reset 重置
+func (jf *JSFinder) Reset() {
+	jf.refList = make([]string, 20)
+}
+
 //FindRef 查找HTML文件的所有引用
 func (jf *JSFinder) FindRef(inputs []byte) []string {
 	//尚未实现
@@ -182,6 +194,11 @@ func (jf *JSFinder) FindRef(inputs []byte) []string {
 // CSSFinder 引用发现器
 type CSSFinder struct {
 	refList []string
+}
+
+// Reset 重置
+func (cf *CSSFinder) Reset() {
+	cf.refList = make([]string, 20)
 }
 
 //FindRef 查找HTML文件的所有引用
