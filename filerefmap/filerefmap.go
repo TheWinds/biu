@@ -148,12 +148,10 @@ func (frm *FileRefMap) AddRef(pathFrom, pathTo string) error {
 	if !(frm.Contains(pathFrom) && frm.Contains(pathTo)) {
 		return errors.New("FileRefMap.AddRef:引用文件失败文件不存在")
 	}
-	// fmt.Println(pathFrom, pathTo)
+
 	fileFrom := frm.getFileFromPath(pathFrom)
 	fileTo := frm.getFileFromPath(pathTo)
-	// fmt.Println(frm.files)
-	// fmt.Println(frm.pathID)
-	// fmt.Println(fileFrom, fileTo)
+
 	fileFrom.AddFileRef(fileTo)
 	if frm.checkCircularRef() {
 		fileFrom.DelFileRef(fileTo)
@@ -167,12 +165,8 @@ func (frm *FileRefMap) DelRef(pathFrom, pathTo string) error {
 	if !(frm.Contains(pathFrom) && frm.Contains(pathTo)) {
 		return errors.New("FileRefMap.DelRef:引用文件失败文件不存在")
 	}
-	// fmt.Println(pathFrom, pathTo)
 	fileFrom := frm.getFileFromPath(pathFrom)
 	fileTo := frm.getFileFromPath(pathTo)
-	// fmt.Println(frm.files)
-	// fmt.Println(frm.pathID)
-	// fmt.Println(fileFrom, fileTo)
 	fileFrom.DelFileRef(fileTo)
 	return nil
 }
@@ -199,43 +193,6 @@ func (frm *FileRefMap) UpdateRef(pathFrom string, newRefList []string) {
 			fileFrom.AddFileRef(fileTo)
 		}
 	}
-	// fmt.Println(pathFrom, pathTo)
-	// fileFrom := frm.getFileFromPath(pathFrom)
-	// for _, newRef := range newRefList {
-	// 	if frm.Contains(newRef) {
-	// 		fileTo := frm.getFileFromPath(newRef)
-	// 		//新增原来没有引用
-	// 		if !fileFrom.IsRef(fileTo) {
-	// 			fileFrom.AddFileRef(fileTo)
-	// 		}
-	// 	}
-	// }
-	// if fileFrom.RefCnt != 0 {
-	// 	dels := make([]string, 0)
-	// 	p := fileFrom.RefFiles.NextRef
-	// 	//寻找多余引用
-	// 	for p != nil {
-	// 		oldRef := frm.files[p.FileId].Path
-	// 		shouldDel := true
-	// 		for _, newRef := range newRefList {
-	// 			if oldRef == newRef {
-	// 				shouldDel = false
-	// 			}
-	// 		}
-	// 		if shouldDel {
-	// 			dels = append(dels, oldRef)
-	// 		}
-	// 		p = p.NextRef
-	// 	}
-	// 	//删除多余引用
-	// 	for _, oldRef := range dels {
-	// 		if frm.Contains(oldRef) {
-	// 			fileTo := frm.getFileFromPath(oldRef)
-	// 			fileFrom.DelFileRef(fileTo)
-
-	// 		}
-	// 	}
-	// }
 	return
 }
 
@@ -244,8 +201,12 @@ func (frm *FileRefMap) FindRoots(filePath string) []string {
 	if !frm.Contains(filePath) {
 		return nil
 	}
+
 	fileTo := frm.getFileFromPath(filePath)
 	var roots []string
+	if fileTo.Type == HTMLFile {
+		return []string{fileTo.Path}
+	}
 	for _, fileNode := range frm.files {
 		if fileNode.Type != HTMLFile {
 			continue

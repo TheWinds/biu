@@ -41,6 +41,7 @@ func TestAll(t *testing.T) {
 	(relmap.AddRef("/hello.html", "/js/j3.js"))
 	Convey("测试寻找根节点", t, func() {
 		So(reflect.DeepEqual(relmap.FindRoots("/js/j3.js"), []string{"/index.html", "/hello.html"}), ShouldBeTrue)
+		So(reflect.DeepEqual(relmap.FindRoots("/index.html"), []string{"/index.html"}), ShouldBeTrue)
 	})
 	Convey("测试检查循环引用", t, func() {
 		So(relmap.checkCircularRef(), ShouldBeFalse)
