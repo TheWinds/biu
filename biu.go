@@ -61,16 +61,20 @@ func main() {
 				}
 			}
 		}()
+		log.Println("共有", len(paths), "个目录")
 		for _, path := range paths {
+			log.Println("|" + path + "|")
 			err = watcher.Watch(path)
+
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal(err, "“"+path+"”")
 			}
 			//加入文件夹列表
 			folders[path] = true
 		}
 		for _, file := range files {
-			fileRefMap.AddFile(getFileInfo(file))
+			_, path, filetype := getFileInfo(file)
+			fileRefMap.AddFile(filerefmap.FileNode{Path: path, Type: filetype})
 		}
 
 		shouldReStart := <-reStart

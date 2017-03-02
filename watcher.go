@@ -154,11 +154,14 @@ func readDirAndFile(workDir string) (files, paths []string, err error) {
 		paths = append(paths, getRelRootFilePath(path, workDir))
 	}
 	//将工作路径根目录加入路径
-	paths = append(paths, "")
+	paths = append(paths, "./")
 	return files, paths, err
 }
 
 //getRelRootFilePath 获取相对路径
 func getRelRootFilePath(path, rootPath string) string {
-	return strings.Replace(path, rootPath, "", -1)
+	if path == rootPath {
+		return "."
+	}
+	return strings.Replace(path, rootPath+"/", "", -1)
 }

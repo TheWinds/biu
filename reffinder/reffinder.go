@@ -100,7 +100,7 @@ func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
 	return realPath, nil
 }
 
-//refFinder 医用发现器接口
+//refFinder 引用发现器接口
 type refFinder interface {
 	FindRef(inputs []byte) []string
 	Reset()
