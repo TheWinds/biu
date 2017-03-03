@@ -151,7 +151,9 @@ func (frm *FileRefMap) AddRef(pathFrom, pathTo string) error {
 
 	fileFrom := frm.getFileFromPath(pathFrom)
 	fileTo := frm.getFileFromPath(pathTo)
-
+	if fileFrom.IsRef(fileTo) {
+		return errors.New("FileRefMap.AddRef:无须重复引用")
+	}
 	fileFrom.AddFileRef(fileTo)
 	if frm.checkCircularRef() {
 		fileFrom.DelFileRef(fileTo)
@@ -172,9 +174,10 @@ func (frm *FileRefMap) DelRef(pathFrom, pathTo string) error {
 }
 
 // UpdateRef 更新新文件引用
-func (frm *FileRefMap) UpdateRef(pathFrom string, newRefList []string) {
+func (frm *FileRefMap) UpdateRef(pathFrom string, newRefList []string) []string {
+	refs := make([]string, 0, len(newRefList))
 	if !frm.Contains(pathFrom) {
-		return
+		return nil
 	}
 	fileFrom := frm.getFileFromPath(pathFrom)
 	if fileFrom.RefCnt != 0 {
@@ -190,10 +193,13 @@ func (frm *FileRefMap) UpdateRef(pathFrom string, newRefList []string) {
 	for _, newRef := range newRefList {
 		if frm.Contains(newRef) {
 			fileTo := frm.getFileFromPath(newRef)
-			fileFrom.AddFileRef(fileTo)
+			if !fileFrom.IsRef(fileTo) {
+				fileFrom.AddFileRef(fileTo)
+				refs = append(refs, newRef)
+			}
 		}
 	}
-	return
+	return refs
 }
 
 //FindRoots 寻找根节点
@@ -201,7 +207,6 @@ func (frm *FileRefMap) FindRoots(filePath string) []string {
 	if !frm.Contains(filePath) {
 		return nil
 	}
-
 	fileTo := frm.getFileFromPath(filePath)
 	var roots []string
 	if fileTo.Type == HTMLFile {

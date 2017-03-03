@@ -1,10 +1,12 @@
 package setting
 
 import (
+	"encoding/base64"
 	"log"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func init() {
@@ -14,13 +16,29 @@ func init() {
 		log.Fatal(err)
 	}
 	OS = runtime.GOOS
+	ScanFilePeriod = int64(time.Millisecond * 10)
+	Port = "8080"
+	WSServPath = "/wsserv"
+	WSConnKey = base64.URLEncoding.EncodeToString([]byte(time.Now().String()))
+	InjectScriptPath = "/" + base64.URLEncoding.EncodeToString([]byte(time.Now().AddDate(3, 4, 5).String())) + ".js"
 }
 
-// WorkDir 工作路径
-var WorkDir string
-
-// OS 系统类型
-var OS string
+var (
+	// WorkDir 工作路径
+	WorkDir string
+	// OS 系统类型
+	OS string
+	// ScanFilePeriod 扫描文件的周期
+	ScanFilePeriod int64
+	// WSConnKey websocket连接秘钥
+	WSConnKey string
+	// WSServPath websocket服务地址
+	WSServPath string
+	// Port websocket服务端口
+	Port string
+	// InjectScriptPath 被注入的脚本地址
+	InjectScriptPath string
+)
 
 //被观察文件的拓展名
 var watchExts = []string{

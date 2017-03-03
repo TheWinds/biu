@@ -10,8 +10,11 @@ import (
 
 	"fmt"
 
-	"github.com/howeyc/fsnotify"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
 	"github.com/thewinds/biu/filerefmap"
+	"github.com/thewinds/biu/reffinder"
 	"github.com/thewinds/biu/setting"
 )
 
@@ -40,7 +43,7 @@ var fileRefMap *filerefmap.FileRefMap
 // StartWatch 开始监听文件
 func StartWatch() {
 	//初始化文件引用关系图
-	fileRefMap := new(filerefmap.FileRefMap)
+	fileRefMap = new(filerefmap.FileRefMap)
 	//扫描文件
 	files, paths, _ := scanDirAndFile()
 
@@ -57,18 +60,18 @@ func StartWatch() {
 	go func() {
 		for {
 			select {
-			case event := <-watcher.Event:
-				eventHandler(watcher, *event)
-			case err := <-watcher.Error:
+			case event := <-watcher.Events:
+				eventHandler(watcher, event)
+			case err := <-watcher.Errors:
 				log.Println("error:", err)
 			}
 		}
 	}()
-
+	log.Println("开始监听代码改动")
 	log.Println("共有", len(paths), "个目录")
 	for _, path := range paths {
 		log.Println("|" + path + "|")
-		err = watcher.Watch(path)
+		err = watcher.Add(path)
 
 		if err != nil {
 			log.Fatal(err, "“"+path+"”")
@@ -80,73 +83,66 @@ func StartWatch() {
 		_, path, filetype := getFileInfo(file)
 		fileRefMap.AddFile(filerefmap.FileNode{Path: path, Type: filetype})
 	}
+	for _, file := range files {
+		updateFileRef(file)
+	}
 	select {}
 }
 
-//处理文件夹
-func dealDir(watcher *fsnotify.Watcher, event fsnotify.FileEvent) {
-	if event.IsCreate() {
-		log.Println("新增文件夹:", event.Name)
-		//folders[event.Name] = true
-		watcher.Watch(event.Name)
+func updateFileRef(fileName string) {
+	fileName = formatName(fileName)
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	if event.IsDelete() {
-		log.Println("删除文件夹:", event.Name)
-		watcher.RemoveWatch(event.Name)
+	reffiles, err := reffinder.FindFileRef(data, fileName, setting.WorkDir)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	if event.IsRename() {
-		log.Println("重命名文件夹:", event.Name)
-
-		//如果是windows重启APP
-		if setting.OS == "windows" {
-			fmt.Println("重启")
-			// reStart <- true
-		}
-		//log.Println(watcher.RemoveWatch(event.Name))
-		// os.Mkdir(event.Name, 0777)
-		//log.Println("err:", watcher.Remove(event.Name))
-	}
+	log.Println(fileName, ":", fileRefMap.UpdateRef(fileName, reffiles))
 }
 
-//处理文件
-func dealFile(watcher *fsnotify.Watcher, event fsnotify.FileEvent) {
-	//忽略不关注的文件
-	if !setting.ShouldWatchFile(event.Name) {
-		return
-	}
-	if event.IsModify() {
-		log.Println("修改文件:", formatName(event.Name))
-		src, err := ioutil.ReadFile(formatName(event.Name))
-		if err != nil {
-			log.Println(err)
-			return
+// isOp 判断操作是否为指定操作
+func isOp(event fsnotify.Event, op fsnotify.Op) bool {
+	return event.Op&op == op
+
+}
+
+// EventTimeLine 事件时间线
+type EventTimeLine struct {
+	EventInfo   string
+	HappendTime int64
+}
+
+var eventTimeLine = new(EventTimeLine)
+
+// 是否应该忽略重复的事件
+func shouldIngoreEvent(event fsnotify.Event) bool {
+	eventInfo := event.String()
+	eventTime := time.Now().UnixNano()
+
+	if eventTimeLine.EventInfo == eventInfo {
+		if eventTime-eventTimeLine.HappendTime > setting.ScanFilePeriod {
+			eventTimeLine.EventInfo = eventInfo
+			eventTimeLine.HappendTime = eventTime
+			return false
 		}
-		fmt.Println(string(src))
-		return
+		return true
 	}
-	if event.IsDelete() {
-		log.Println("删除文件:", event.Name)
-	}
-	if event.IsRename() {
-		log.Println("重命名文件:", event.Name)
-		return
-	}
-	if event.IsCreate() {
-		log.Println("新增文件:", event.Name)
-		src, err := ioutil.ReadFile(event.Name)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		fmt.Println(string(src))
-		return
-	}
+	eventTimeLine.EventInfo = eventInfo
+	eventTimeLine.HappendTime = eventTime
+	return false
 }
 
 //事件处理器
-func eventHandler(watcher *fsnotify.Watcher, event fsnotify.FileEvent) {
+func eventHandler(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	if shouldIngoreEvent(event) {
+		return
+	}
 	//检查是否是文件夹
-	log.Println(event.String())
+
 	if isDir(event) {
 		dealDir(watcher, event)
 		return
@@ -154,11 +150,74 @@ func eventHandler(watcher *fsnotify.Watcher, event fsnotify.FileEvent) {
 	dealFile(watcher, event)
 }
 
+//处理文件夹
+func dealDir(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	dirName := formatName(event.Name)
+	if isOp(event, fsnotify.Create) {
+		log.Println("新增文件夹:", dirName)
+		monitoredDirs.Add(dirName)
+		watcher.Add(dirName)
+	}
+	if isOp(event, fsnotify.Remove) {
+		log.Println("删除文件夹:", dirName)
+		monitoredDirs.Remove(dirName)
+		fileRefMap.RemoveDirFile(dirName)
+		watcher.Remove(dirName)
+	}
+	if isOp(event, fsnotify.Rename) {
+		log.Println("重命名文件夹:", dirName)
+		monitoredDirs.Remove(dirName)
+		fileRefMap.RemoveDirFile(dirName)
+	}
+}
+
+//处理文件
+func dealFile(watcher *fsnotify.Watcher, event fsnotify.Event) {
+	fileName := formatName(event.Name)
+	//忽略不关注的文件
+	if !setting.ShouldWatchFile(fileName) {
+		return
+	}
+	// 判断事件类型
+	if isOp(event, fsnotify.Write) {
+		updateFileRef(fileName)
+		//如果是html文件的改动就直接通知
+		if strings.HasSuffix(fileName, ".html") {
+			NotifyRefresh(fileName)
+			return
+		}
+		//否则检测到根html节点然后通知所有相应文件刷新
+		files := fileRefMap.FindRoots(fileName)
+		NotifyMultiRefresh(files)
+
+		return
+	}
+	if isOp(event, fsnotify.Remove) {
+		// log.Println("删除文件:", fileName)
+
+		files := fileRefMap.FindRoots(fileName)
+		NotifyMultiRefresh(files)
+		fileRefMap.RemoveFile(fileName)
+	}
+	if isOp(event, fsnotify.Rename) {
+		// log.Println("重命名文件:", fileName)
+		fileRefMap.RemoveFile(fileName)
+		return
+	}
+	if isOp(event, fsnotify.Create) {
+		// log.Println("新增文件:", fileName)
+		_, path, filetype := getFileInfo(fileName)
+		fileRefMap.AddFile(filerefmap.FileNode{Path: path, Type: filetype})
+		updateFileRef(fileName)
+		return
+	}
+}
+
 // isFolder判断是否为文件夹
-func isDir(event fsnotify.FileEvent) bool {
+func isDir(event fsnotify.Event) bool {
 	fileName := formatName(event.Name)
 	//被监控过因此是文件夹
-	if event.IsDelete() || event.IsRename() {
+	if isOp(event, fsnotify.Remove) || isOp(event, fsnotify.Rename) {
 		return monitoredDirs.Has(fileName)
 	}
 	//检查存在的文件是否为文件夹
@@ -206,7 +265,7 @@ func scanDirAndFile() (files, dirs []string, err error) {
 		return nil
 	})
 	//将工作路径根目录加入路径
-	dirs = append(dirs, ".")
+	dirs = append(dirs, "")
 	return files, dirs, err
 }
 
@@ -221,4 +280,18 @@ func formatName(filename string) string {
 		return filename[2:]
 	}
 	return filename
+}
+func getFileInfo(filePath string) (name, path string, filetype filerefmap.FileType) {
+	name = filepath.Base(filePath)
+	path = filePath
+	ext := strings.ToLower(filepath.Ext(filePath))
+	switch ext {
+	case "js":
+		filetype = filerefmap.JSFile
+	case "css":
+		filetype = filerefmap.CSSFile
+	case "HTML":
+		filetype = filerefmap.HTMLFile
+	}
+	return
 }
