@@ -8,10 +8,9 @@ import (
 
 	"io/ioutil"
 
-	"fmt"
-
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
 	"github.com/thewinds/biu/filerefmap"
 	"github.com/thewinds/biu/reffinder"
@@ -46,10 +45,6 @@ func StartWatch() {
 	fileRefMap = new(filerefmap.FileRefMap)
 	//扫描文件
 	files, paths, _ := scanDirAndFile()
-
-	fmt.Println(files)
-	fmt.Println(paths)
-
 	//初始化监听器
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -67,10 +62,9 @@ func StartWatch() {
 			}
 		}
 	}()
-	log.Println("开始监听代码改动")
-	log.Println("共有", len(paths), "个目录")
+	color.Green("[Biu] 开始监听代码改动")
+	color.Red("[Biu] 保存文件后相关文件会自动刷新 ❤")
 	for _, path := range paths {
-		log.Println("|" + path + "|")
 		err = watcher.Add(path)
 
 		if err != nil {
@@ -101,7 +95,7 @@ func updateFileRef(fileName string) {
 		log.Println(err)
 		return
 	}
-	log.Println(fileName, ":", fileRefMap.UpdateRef(fileName, reffiles))
+	fileRefMap.UpdateRef(fileName, reffiles)
 }
 
 // isOp 判断操作是否为指定操作
@@ -154,18 +148,18 @@ func eventHandler(watcher *fsnotify.Watcher, event fsnotify.Event) {
 func dealDir(watcher *fsnotify.Watcher, event fsnotify.Event) {
 	dirName := formatName(event.Name)
 	if isOp(event, fsnotify.Create) {
-		log.Println("新增文件夹:", dirName)
+		// log.Println("新增文件夹:", dirName)
 		monitoredDirs.Add(dirName)
 		watcher.Add(dirName)
 	}
 	if isOp(event, fsnotify.Remove) {
-		log.Println("删除文件夹:", dirName)
+		// log.Println("删除文件夹:", dirName)
 		monitoredDirs.Remove(dirName)
 		fileRefMap.RemoveDirFile(dirName)
 		watcher.Remove(dirName)
 	}
 	if isOp(event, fsnotify.Rename) {
-		log.Println("重命名文件夹:", dirName)
+		// log.Println("重命名文件夹:", dirName)
 		monitoredDirs.Remove(dirName)
 		fileRefMap.RemoveDirFile(dirName)
 	}

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	"net/http"
 
 	"github.com/thewinds/biu/setting"
@@ -40,7 +38,6 @@ func onReq(ws *websocket.Conn) {
 	//释放资源
 	delete(onlineTabs, ws)
 	ws.Close()
-	log.Println(fileName, key, "结束链接")
 
 }
 
@@ -53,15 +50,12 @@ func handlerConn(ws *websocket.Conn, tab *Tab) {
 
 // NotifyRefresh 通知浏览器刷新
 func NotifyRefresh(fileName string) {
-	log.Println(len(onlineTabs))
 	for ws, tab := range onlineTabs {
 		if tab.FileName == fileName {
-			log.Println("通知:", fileName, "刷新")
 			websocket.JSON.Send(ws, "refresh")
 
 		}
 	}
-	log.Println("通知结束")
 }
 
 // NotifyMultiRefresh 通知多个文件刷新
@@ -98,10 +92,8 @@ var connURL="ws:localhost:"+port+wsservpath+"?filename="+filename+"&"+"key="+key
 var ws=new WebSocket(connURL)
 
 ws.onmessage=function(){
-    console.log("欧尼吗")
     window.location.reload()
     ws.onclose()
-    // ws=new WebSocket(connURL)
 }
 }
 connectServ()
