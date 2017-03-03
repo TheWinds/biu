@@ -34,7 +34,10 @@ func initServ() {
 			ctx.Write([]byte(`<script src="` + setting.InjectScriptPath + `"></script>`))
 		}
 	})
-	m.Use(macaron.Static(""))
+
+	m.Use(macaron.Static("", macaron.StaticOptions{
+		SkipLogging: true,
+	}))
 	m.Get(setting.InjectScriptPath, func() string {
 		return GetInjectScript()
 	})
