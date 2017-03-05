@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"log"
 
@@ -15,38 +14,30 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/thewinds/biu/setting"
-	"gopkg.in/macaron.v1"
 )
 
 func main() {
-	log.SetPrefix("[Biu]")
 	initFlag()
-	initServ()
+	startServ()
 	StartWatch()
 
 }
-func initServ() {
+func startServ() {
 	wshander := InitNotifyServ()
-	macaron.Env = macaron.PROD
-	m := macaron.New()
-	m.Use(func(ctx *macaron.Context) {
-		if strings.HasSuffix(ctx.Req.URL.String(), ".html") || strings.HasSuffix(ctx.Req.URL.String(), "/") {
-			ctx.Write([]byte(`<script src="` + setting.InjectScriptPath + `"></script>`))
-		}
-	})
-
-	m.Use(macaron.Static("", macaron.StaticOptions{
-		SkipLogging: true,
-	}))
-	m.Get(setting.InjectScriptPath, func() string {
-		return GetInjectScript()
-	})
-
+	// 通知页面刷新的websocket服务
 	http.Handle(setting.WSServPath, wshander)
-	http.Handle("/", m)
-
+	// 文件服务器
+	http.Handle("/", InjectFileServer(http.Dir(""), InjectScriptFunc))
+	// 获取要注入的js代码的handler
+	http.HandleFunc(setting.InjectScriptPath, InjectScriptHandler)
 	color.Green("[Biu] 启动http服务 localhost:" + setting.Port)
-	go http.ListenAndServe(":"+setting.Port, nil)
+	go func() {
+		err := http.ListenAndServe(":"+setting.Port, nil)
+		if err != nil {
+			color.Red("启动http服务器失败")
+			os.Exit(1)
+		}
+	}()
 }
 func initFlag() {
 	port := flag.String("p", "8080", "指定运行的端口")
