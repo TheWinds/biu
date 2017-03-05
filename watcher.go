@@ -63,7 +63,7 @@ func StartWatch() {
 		}
 	}()
 	color.Green("[Biu] 开始监听代码改动")
-	color.Red("[Biu] 保存文件后相关文件会自动刷新 ❤")
+	color.Red("[Biu] 保存文件后相关页面会自动刷新 ❤")
 	for _, path := range paths {
 		err = watcher.Add(path)
 
