@@ -56,7 +56,8 @@ func NotifyRefresh(fileName string) {
 	for ws, tab := range onlineTabs {
 		if tab.FileName == fileName {
 			websocket.JSON.Send(ws, "refresh")
-
+			RefreshTimes++
+			updateTerm()
 		}
 	}
 }

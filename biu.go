@@ -16,12 +16,19 @@ import (
 	"github.com/thewinds/biu/setting"
 )
 
+var (
+	// NumOfWatcherFiles 观察的文件个数
+	NumOfWatcherFiles = 0
+	// RefreshTimes 刷新的次数
+	RefreshTimes = 0
+)
+
 func main() {
 	initFlag()
 	startServ()
 	StartWatch()
-
 }
+
 func startServ() {
 	wshander := InitNotifyServ()
 	// 通知页面刷新的websocket服务
@@ -57,4 +64,7 @@ func initFlag() {
 		log.Fatal("端口不正确,请检查")
 	}
 	setting.Port = *port
+}
+func updateTerm() {
+	color.Cyan("\033[100D[ %d个文件正在被监控 Biu为您持续刷新%d次 ]\033[1A", NumOfWatcherFiles, RefreshTimes)
 }
