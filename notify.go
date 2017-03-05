@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"net/http"
+	"strings"
 
 	"github.com/thewinds/biu/setting"
 	"golang.org/x/net/websocket"
@@ -9,12 +11,13 @@ import (
 
 var onlineTabs map[*websocket.Conn]*Tab
 
+// Tab 页面标签
 type Tab struct {
 	FileName string
 	Over     chan bool
 }
 
-// InitNotifyServ 初始化通知服务器
+// InitNotifyServ 初始化通知刷新服务器
 func InitNotifyServ() http.Handler {
 	onlineTabs = make(map[*websocket.Conn]*Tab)
 	return websocket.Handler(onReq)
@@ -65,9 +68,21 @@ func NotifyMultiRefresh(files []string) {
 	}
 }
 
-// GetInjectScript 获取注入脚本
-func GetInjectScript() string {
-	return injectScript
+// InjectScriptHandler 注入脚本的handler
+func InjectScriptHandler(rw http.ResponseWriter, r *http.Request) {
+	rw.Write([]byte(injectScript))
+}
+
+// InjectScriptFunc 向页面注入内容的func
+func InjectScriptFunc(name string, basebytes []byte) []byte {
+	if strings.HasSuffix(name, ".html") {
+		return bytes.Replace(
+			basebytes,
+			[]byte(`</body>`),
+			[]byte(`<script src="`+setting.InjectScriptPath+`"></script>`+"\n"+"</body>"),
+			1)
+	}
+	return basebytes
 }
 
 //向页面注入的脚本
@@ -93,7 +108,7 @@ var ws=new WebSocket(connURL)
 
 ws.onmessage=function(){
     window.location.reload()
-    ws.onclose()
+    ws.close()
 }
 }
 connectServ()
