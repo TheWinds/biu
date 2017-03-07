@@ -79,7 +79,7 @@ func updateFileRef(fileName string) {
 	}
 	reffiles, err := reffinder.FindFileRef(data, fileName, setting.WorkDir)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		return
 	}
 	fileRefMap.UpdateRef(fileName, reffiles)
