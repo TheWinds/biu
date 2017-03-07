@@ -6,6 +6,8 @@
 - 无须浏览器插件支持 :rocket:
 - 刷新速度快 :zap:
 - 跨平台支持 :cloud:
+
+## :bulb:[点击这里下载](https://github.com/TheWinds/biu/releases/tag/v1.0)
 ## 使用帮助 
 | 命令 | 说明 |
 | ---- | ---- |
