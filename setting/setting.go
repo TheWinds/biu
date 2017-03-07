@@ -38,6 +38,17 @@ var (
 	Port string
 	// InjectScriptPath 被注入的脚本地址
 	InjectScriptPath string
+
+	// Logo
+	Logo = `
+______   _         
+| ___ \ (_)        
+| |_/ /  _   _   _ 
+| ___ \ | | | | | |
+| |_/ / | | | |_| |
+\____/  |_|  \__,_|
+                    v1.0				   
+`
 )
 
 //被观察文件的拓展名

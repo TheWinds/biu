@@ -24,6 +24,7 @@ var (
 )
 
 func main() {
+	color.White(setting.Logo)
 	initFlag()
 	startServ()
 	StartWatch()
