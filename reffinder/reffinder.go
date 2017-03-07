@@ -8,9 +8,9 @@ import (
 
 	"bytes"
 
-	"runtime"
-
 	"path/filepath"
+
+	"github.com/thewinds/biu/setting"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -51,7 +51,7 @@ func FindFileRef(file []byte, filePath, rootPath string) ([]string, error) {
 //getRealPath 获取被引用文件相对根目录的真实地址
 func getRealPath(filePath, refFilePath, rootPath string) (string, error) {
 	pathSep := "/"
-	if runtime.GOOS == "windows" {
+	if setting.OS == "windows" {
 		pathSep = "\\"
 	}
 	//统一格式
