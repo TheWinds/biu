@@ -22,12 +22,12 @@ cp  release/builds/win64/biu.exe release/apps/biu-win-64/biu.exe
 cp  release/builds/darwin64/biu release/apps/biu-darwin-64/biu
 
 cp  release/builds/linux64/biu release/apps/biu-linux-64/biu
-
+version="1.1"
 echo "正在打包.."
-zip -qj release/apps/biu-win-32.zip release/apps/biu-win-32/*
-zip -qj release/apps/biu-win-64.zip release/apps/biu-win-64/*
-zip -qj release/apps/biu-darwin-64.zip release/apps/biu-darwin-64/*
-zip -qj release/apps/biu-linux-64.zip release/apps/biu-linux-64/*
+zip -qj release/apps/biu-${version}-win32.zip release/apps/biu-win-32/*
+zip -qj release/apps/biu-${version}-win64.zip release/apps/biu-win-64/*
+zip -qj release/apps/biu-${version}-darwin64.zip release/apps/biu-darwin-64/*
+zip -qj release/apps/biu-${version}-linux64.zip release/apps/biu-linux-64/*
 
 echo "清除临时文件.."
 rm -rf release/apps/biu-win-32/
