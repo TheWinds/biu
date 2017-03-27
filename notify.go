@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"fmt"
+
 	"github.com/thewinds/biu/setting"
 	"golang.org/x/net/websocket"
 )
@@ -71,7 +73,7 @@ func NotifyMultiRefresh(files []string) {
 
 // InjectScriptHandler 注入脚本的handler
 func InjectScriptHandler(rw http.ResponseWriter, r *http.Request) {
-	rw.Write([]byte(injectScript))
+	rw.Write(buildInjectScript(setting.WSServPath, setting.Port, setting.WSConnKey))
 }
 
 // InjectScriptFunc 向页面注入内容的func
@@ -86,24 +88,26 @@ func InjectScriptFunc(name string, basebytes []byte) []byte {
 	return basebytes
 }
 
-//向页面注入的脚本
-var injectScript = `
-function connectServ(){
-var key="` + setting.WSConnKey + `"
-var port="` + setting.Port + `"
-var wsservpath="` + setting.WSServPath + `"
-
-var fullpath=window.location.href
-var filename=fullpath.substring(fullpath.indexOf("/",7)+1)
-if(!(filename.endsWith(".html")||filename.endsWith(".htm"))){
-    if(filename.endsWith("/")||filename===""){
-        filename+="index.html"
-    }else{
-        filename+="/index.html"
-    }
+//构建向页面注入的脚本
+func buildInjectScript(servPath, port, key string) []byte {
+	return []byte(fmt.Sprintf(injectScriptTemplate, key, port, servPath))
 }
 
-var connURL="ws:localhost:"+port+wsservpath+"?filename="+filename+"&"+"key="+key
+//注入脚本模板
+const injectScriptTemplate = `
+function connectServ(){
+var key="%s"
+var port=%s
+var wsservpath="%s"
+
+var pathname=window.location.pathname
+
+if (pathname==="/"){
+    pathname+="index.html"
+}
+pathname=pathname.substring(1)
+
+var connURL="ws:localhost:"+port+wsservpath+"?filename="+pathname+"&"+"key="+key
 
 var ws=new WebSocket(connURL)
 
